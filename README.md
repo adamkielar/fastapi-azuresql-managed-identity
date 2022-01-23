@@ -18,7 +18,7 @@ In this tutorial I will create simple infrastructure in Azure which will contain
 I will deploy simple application build with [FastApi](https://fastapi.tiangolo.com/).
 Then I will test connection between application and Azure SQL using Managed Identity instead of user and password.
 
-I will use [SQLAlchemy](https://docs.sqlalchemy.org/en/14/core/engines.html) to create connection to database.
+I will use [SQLAlchemy](https://docs.sqlalchemy.org/en/14/core/engines.html) and [PyODBC](https://github.com/mkleehammer/pyodbc/wiki) to create connection to database.
 ```python
 from dataclasses import dataclass
 from types import TracebackType
