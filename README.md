@@ -10,10 +10,63 @@ You can find list of this resources [here.](https://azure.microsoft.com/en-us/pr
 
 ### Overview
   
-In this tutorial you will create simple infrastructure in Azure which will contain following resources:
+In this tutorial I will create simple infrastructure in Azure which will contain following resources:
 * [Container Registry](https://docs.microsoft.com/en-us/azure/container-registry/)
 * [App Service](https://docs.microsoft.com/en-us/azure/app-service/)
 * [Azure SQL database](https://docs.microsoft.com/en-us/azure/azure-sql/database/)
+
+I will deploy simple application build with [FastApi](https://fastapi.tiangolo.com/).
+Then I will test connection between application and Azure SQL using Managed Identity instead of user and password.
+
+I will use [SQLAlchemy](https://docs.sqlalchemy.org/en/14/core/engines.html) to create connection to database.
+```python
+from dataclasses import dataclass
+from types import TracebackType
+from typing import Optional
+from typing import Type
+
+import pyodbc
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
+from sqlalchemy.orm import sessionmaker
+
+from database_interface.config import db_settings
+
+pyodbc.pooling = False
+
+DATABASE_URL = URL.create("mssql+pyodbc", query={"odbc_connect": db_settings.DB_CONNECTION_STRING})
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, future=True)
+
+
+@dataclass
+class DBSessionManager:
+    def __post_init__(self) -> None:
+        self.db_session = SessionLocal()
+
+    def __enter__(self) -> SessionLocal:
+        return self.db_session
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        self.db_session.close()
+
+    async def __aenter__(self) -> SessionLocal:
+        return self.db_session
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        self.db_session.close()
+```
 
 I will use following variables in this tutorial:
 ```python
@@ -119,9 +172,36 @@ az sql server create --enable-ad-only-auth --external-admin-principal-type User 
 ```
 ![alt text](images/sql-server.png "Azure SQL Server")
 
-Create test database:
+### Create database:
+```yaml
 az sql db create --name $sqldb --server $sqlservername --resource-group $resourceGroup --collation Polish_CI_AS --edition GeneralPurpose --family Gen5 --capacity 2
 
+```
+![alt text](images/sql-database.png "Azure SQL database")
+
+### Allow Azure services and resources to access server
+```yaml
 az sql server firewall-rule create --resource-group $resourceGroup --server $sqlservername --name dbtutorial --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
 
+```
+
+### After all needed resources finished provisioning with success I can now add DB_CONNECTION_STRING environment variable to App Service
+To improve this solution, environment variable can be stored in [Key Vault](https://docs.microsoft.com/en-us/azure/key-vault/)
+```yaml
 az webapp config appsettings set --resource-group $resourceGroup --name $webapp --settings DB_CONNECTION_STRING=$DB_CONNECTION_STRING
+az webapp restart --resource-group $resourceGroup --name $webapp
+```
+
+![alt text](images/app-env.png "App Service Env")
+
+### Test application
+
+`https://dbtutorialapp.azurewebsites.net/api/v1/mssql_db`
+
+![alt text](images/db-healthcheck.png "Db health check")
+
+### Clean up and remove resources
+
+```yaml
+az group delete --name $resourceGroup 
+```
