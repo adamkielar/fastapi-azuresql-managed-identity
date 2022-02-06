@@ -83,14 +83,14 @@ from database_interface.config import db_settings
 
 pyodbc.pooling = False
 
-DATABASE_URL = URL.create("mssql+pyodbc", query={"odbc_connect": db_settings.DB_CONNECTION_STRING})
+DATABASE_URL = URL.create("mssql+pyodbc", query={"odbc_connect": db_settings.MSSQL_CONNECTION_STRING})
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, future=True)
 
 
 @dataclass
-class DBSessionManager:
+class MssqlSessionManager:
     def __post_init__(self) -> None:
         self.db_session = SessionLocal()
 
